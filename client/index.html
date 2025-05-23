@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Akka Storage Client Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2em; }
+    input, button { margin: 0.5em 0; }
+    .section { margin-bottom: 2em; }
+  </style>
+</head>
+<body>
+  <h1>Akka Storage Client Test</h1>
+
+  <div class="section">
+    <h2>1. Вход</h2>
+    <input type="text" id="username" placeholder="Имя пользователя" value="admin">
+    <input type="password" id="password" placeholder="Пароль" value="password">
+    <button onclick="login()">Войти</button>
+    <div id="loginResult"></div>
+  </div>
+
+  <div class="section">
+    <h2>2. Загрузка файла</h2>
+    <input type="file" id="fileInput">
+    <button onclick="uploadFile()">Загрузить</button>
+    <div id="uploadResult"></div>
+  </div>
+
+  <div class="section">
+    <h2>3. Скачать файл</h2>
+    <input type="text" id="downloadFileName" placeholder="Имя файла">
+    <button onclick="downloadFile()">Скачать</button>
+    <div id="downloadResult"></div>
+  </div>
+
+  <div id="result"></div>
+
+  <script>
+    let token = "";
+
+    function show(id, msg) {
+      document.getElementById(id).textContent = msg;
+    }
+
+    async function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const form = new URLSearchParams({ username, password });
+
+      const res = await fetch('http://localhost:8080/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        token = data.token;
+        show('loginResult', 'Успешно! JWT сохранён.');
+      } else {
+        show('loginResult', 'Ошибка входа');
+      }
+    }
+
+    async function uploadFile() {
+      if (!token) return show('uploadResult', 'Сначала войдите!');
+      const fileInput = document.getElementById('fileInput');
+      if (!fileInput.files.length) return show('uploadResult', 'Выберите файл!');
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      const res = await fetch('http://localhost:8080/upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        show('uploadResult', 'Загружено: ' + data.uploaded.join(', '));
+      } else {
+        show('uploadResult', 'Ошибка загрузки');
+      }
+    }
+
+    async function downloadFile() {
+      if (!token) return show('downloadResult', 'Сначала войдите!');
+      const fileName = document.getElementById('downloadFileName').value;
+      if (!fileName) return show('downloadResult', 'Введите имя файла!');
+      const res = await fetch('http://localhost:8080/download/' + encodeURIComponent(fileName), {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        show('downloadResult', 'Файл скачан!');
+      } else {
+        show('downloadResult', 'Ошибка скачивания');
+      }
+    }
+  </script>
+</body>
+</html>
