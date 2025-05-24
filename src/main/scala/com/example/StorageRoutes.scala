@@ -9,16 +9,15 @@ import scala.concurrent.Future
 import akka.http.scaladsl.model.Multipart
 import akka.http.scaladsl.server.directives.Credentials
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
-import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.model.HttpMethods
 import JsonFormats._
+import spray.json._
+import scala.concurrent.ExecutionContext
 
 class StorageRoutes(implicit val system: ActorSystem[_]) {
   private val storageDir = "storage"
-
-  // Это тест, если будет микросервис, то нужно будет удалить
   private val hardcodedUser = "admin"
   private val hardcodedPassword = "password"
+  implicit val ec: ExecutionContext = system.executionContext
 
   Files.createDirectories(Paths.get(storageDir))
 
@@ -33,12 +32,18 @@ class StorageRoutes(implicit val system: ActorSystem[_]) {
                   val fileName = b.filename.get
                   val filePath = Paths.get(storageDir, fileName)
                   val sink = Files.newOutputStream(filePath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
-                  b.entity.dataBytes.runForeach(chunk => sink.write(chunk.toArray)).andThen { case _ => sink.close() }(system.executionContext)
+                  b.entity.dataBytes.runForeach(chunk => sink.write(chunk.toArray))
+                    .andThen { case _ => sink.close() }(system.executionContext)
                     .map(_ => fileName)(system.executionContext)
                 case _ => Future.successful("")
               }.runFold(Seq.empty[String])(_ :+ _)
+
               onSuccess(uploaded) { files =>
-                complete(Uploaded(files.filter(_.nonEmpty)))
+                val uploadedFiles = files.filter(_.nonEmpty)
+                if (uploadedFiles.nonEmpty) {
+                  NotifierClient.sendFilesNotification(uploadedFiles)
+                }
+                complete(Uploaded(uploadedFiles))
               }
             }
           }

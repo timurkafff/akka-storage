@@ -22,10 +22,18 @@ lazy val root = (project in file(".")).
       "com.typesafe.akka" %% "akka-stream"              % akkaVersion,
       "com.typesafe.akka" %% "akka-pki"                 % akkaVersion,
       "ch.qos.logback"    % "logback-classic"           % "1.5.17",
-      "com.auth0"         % "java-jwt"                  % "4.5.0"
+      "com.auth0"         % "java-jwt"                  % "4.5.0",
 
       // "com.typesafe.akka" %% "akka-http-testkit"        % akkaHttpVersion % Test,
       // "com.typesafe.akka" %% "akka-actor-testkit-typed" % akkaVersion     % Test,
       // "org.scalatest"     %% "scalatest"                % "3.2.12"        % Test
-    )
+    ),
+    ThisBuild / assemblyMergeStrategy := {
+      case PathList("META-INF", "versions", "9", "module-info.class") => MergeStrategy.discard
+      case PathList("module-info.class") => MergeStrategy.discard
+      case x =>
+        val oldStrategy = (ThisBuild / assemblyMergeStrategy).value
+        oldStrategy(x)
+    }
   )
+  // .enablePlugins(DockerPlugin)
